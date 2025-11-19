@@ -1,0 +1,70 @@
+#!/usr/bin/env bash
+# =====================================================================
+#  labctl — pilote des labs Kubernetes guidés
+# =====================================================================
+set -u
+ROOT="$(cd "$(dirname "$0")" && pwd)"
+LABS="$ROOT/labs"
+RES="${RESULTS_DIR:-$ROOT/results}"; export RESULTS_DIR="$RES"
+
+usage() {
+  cat <<USAGE
+Usage : ./labctl <commande> [n° de lab]
+
+  list            Liste les labs disponibles
+  start  <NN>     Prépare l'environnement du lab NN (namespace, objets de départ)
+  check  <NN>     Vérifie automatiquement votre travail sur le lab NN
+  hint   <NN>     Affiche les indices du lab NN
+  reset  <NN>     Supprime le namespace du lab NN et le recrée à l'état initial
+  report          Lance toutes les vérifications et produit results/rapport.csv
+  clean           Supprime tous les namespaces des labs
+
+Exemple : ./labctl start 01 && ./labctl check 01
+USAGE
+}
+
+LAB_DIR=""
+resolve_lab() {
+  [[ "${1:-}" =~ ^[0-9]{1,2}$ ]] || { echo "Numéro de lab invalide : '${1:-}' (ex. : 01)" >&2; exit 2; }
+  local n; n=$(printf '%02d' "$((10#$1))")
+  [ -d "$LABS/lab$n" ] || { echo "Lab $n introuvable. Voir : ./labctl list" >&2; exit 2; }
+  LAB_DIR="$LABS/lab$n"
+}
+
+cmd=${1:-}; arg=${2:-}
+case "$cmd" in start|check|hint|reset) resolve_lab "$arg" ;; esac
+case "$cmd" in
+  list)
+    for d in "$LABS"/lab*/; do
+      n=$(basename "$d"); printf '  %s  %s\n' "${n#lab}" "$(head -1 "$d/README.md" | sed 's/^# //')"
+    done ;;
+  start) bash "$LAB_DIR/setup.sh" ;;
+  check) bash "$LAB_DIR/check.sh" ;;
+  hint)  cat "$LAB_DIR/hints.md" ;;
+  reset)
+    kubectl delete namespace "$(basename "$LAB_DIR")" --ignore-not-found --wait=true
+    bash "$LAB_DIR/setup.sh" ;;
+  report)
+    mkdir -p "$RES"
+    total=0; max=0
+    echo "lab;titre;points;max;note20" > "$RES/rapport.csv"
+    for d in "$LABS"/lab*/; do
+      n=$(basename "$d"); n=${n#lab}
+      f="$RES/lab$n.json"
+      rm -f -- "$f"
+      bash "$d/check.sh" || true
+      if [ -f "$f" ]; then
+        p=$(sed -n 's/.*"points":\([0-9.]*\),"max":\([0-9.]*\),"note20":\([0-9.]*\).*/\1;\2;\3/p' "$f")
+        t=$(sed -n 's/.*"titre":"\([^"]*\)".*/\1/p' "$f")
+        echo "$n;$t;$p" >> "$RES/rapport.csv"
+        total=$(awk "BEGIN{print $total + $(echo "$p" | cut -d';' -f1)}")
+        max=$(awk "BEGIN{print $max + $(echo "$p" | cut -d';' -f2)}")
+      fi
+    done
+    note=$(awk "BEGIN{ if ($max>0) printf \"%.1f\", 20*$total/$max; else print 0 }")
+    echo "TOTAL;;$total;$max;$note" >> "$RES/rapport.csv"
+    echo; echo "Rapport global : $total/$max points — note $note/20 (results/rapport.csv)" ;;
+  clean)
+    for d in "$LABS"/lab*/; do kubectl delete namespace "$(basename "$d")" --ignore-not-found --wait=false; done ;;
+  *) usage; [ -z "$cmd" ] && exit 0 || exit 2 ;;
+esac

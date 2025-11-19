@@ -1,0 +1,11 @@
+# Tests des scripts de vérification avec un kubectl simulé (rapide, sans cluster).
+name: Tests des scripts
+on: [push, pull_request]
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: pip install pyyaml
+      - run: shellcheck -S warning -e SC1091,SC2034 labctl lib/common.sh labs/*/*.sh solutions/*.sh tests/run-tests.sh
+      - run: tests/run-tests.sh

@@ -1,0 +1,28 @@
+# Correction automatique des rendus étudiants (GitHub Classroom ou dépôt Git de l'étudiant).
+# L'étudiant dépose ses fichiers dans rendu/labNN/ :
+#   - *.yaml : manifestes appliqués dans l'ordre alphabétique
+#   - *.sh   : commandes kubectl (pour les labs 03 et 07)
+#   - diagnostic.txt (lab 07)
+name: Correction automatique
+on: [push, workflow_dispatch]
+jobs:
+  grade:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: helm/kind-action@v1
+        with: { cluster_name: labs }
+      - name: Appliquer les rendus et vérifier
+        run: |
+          for d in labs/lab*/; do
+            n=$(basename "$d"); n=${n#lab}
+            [ -d "rendu/lab$n" ] || continue
+            bash "$d/setup.sh"
+            for f in rendu/lab$n/*.yaml; do [ -f "$f" ] && kubectl apply -f "$f"; done
+            for f in rendu/lab$n/*.sh;   do [ -f "$f" ] && bash "$f"; done
+            [ -f "rendu/lab$n/diagnostic.txt" ] && cp "rendu/lab$n/diagnostic.txt" "$d/"
+          done
+          ./labctl report || true
+      - uses: actions/upload-artifact@v4
+        with: { name: resultats, path: results/ }

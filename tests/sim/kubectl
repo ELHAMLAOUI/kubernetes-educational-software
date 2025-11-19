@@ -1,0 +1,126 @@
+#!/usr/bin/env python3
+"""Simulateur kubectl pour tester les check.sh sans cluster.
+Etat lu dans $SIM_STATE (JSON) : objets par namespace/kind/name + extras (ready, http, exec)."""
+import json, os, re, sys
+
+state = json.load(open(os.environ["SIM_STATE"]))
+LOG = os.environ.get("SIM_LOG")
+args = sys.argv[1:]
+if LOG:
+    with open(LOG, "a") as f: f.write(" ".join(args) + "\n")
+
+ALIAS = {"pod": "pod", "pods": "pod", "po": "pod", "deployment": "deployment", "deploy": "deployment",
+         "deployments": "deployment", "service": "service", "svc": "service", "configmap": "configmap",
+         "cm": "configmap", "secret": "secret", "endpoints": "endpoints", "ep": "endpoints"}
+
+ns, rest, opts = "default", [], {}
+i = 0
+while i < len(args):
+    a = args[i]
+    if a == "-n": ns = args[i + 1]; i += 2; continue
+    if a == "--": rest.append("--"); rest.extend(args[i + 1:]); break
+    if a in ("-o", "-l"): opts[a] = args[i + 1]; i += 2; continue
+    if a.startswith("-o"): opts["-o"] = a[2:].lstrip("="); i += 1; continue
+    if a.startswith("--"):
+        k, _, v = a.partition("="); opts[k] = v; i += 1; continue
+    if a.startswith("-"): opts[a] = True; i += 1; continue
+    rest.append(a); i += 1
+
+objs = state["objects"].get(ns, {})
+
+def find(kind, name):
+    return objs.get(ALIAS.get(kind, kind), {}).get(name)
+
+def split_path(p):
+    p = p.strip()
+    if p.startswith("{") and p.endswith("}"): p = p[1:-1]
+    p = p.lstrip(".")
+    parts, cur, j = [], "", 0
+    while j < len(p):
+        if p[j] == "\\" and j + 1 < len(p): cur += p[j + 1]; j += 2; continue
+        if p[j] == ".": parts.append(cur); cur = ""; j += 1; continue
+        cur += p[j]; j += 1
+    parts.append(cur)
+    return parts
+
+def evaluate(obj, path):
+    vals = [obj]
+    for part in split_path(path):
+        m = re.match(r"^([^\[]*)(?:\[(\*|-?\d+)\])?$", part)
+        key, idx = m.group(1), m.group(2)
+        nxt = []
+        for v in vals:
+            if key:
+                if not isinstance(v, dict) or key not in v: continue
+                v = v[key]
+            if idx is None: nxt.append(v)
+            elif isinstance(v, list):
+                if idx == "*": nxt.extend(v)
+                else:
+                    k = int(idx)
+                    if -len(v) <= k < len(v): nxt.append(v[k])
+        vals = nxt
+    out = []
+    for v in vals:
+        if isinstance(v, bool): out.append(str(v).lower())
+        elif isinstance(v, (dict, list)): out.append(json.dumps(v))
+        else: out.append(str(v))
+    return " ".join(out)
+
+def selector_pods(sel):
+    k, _, v = sel.partition("=")
+    return [p for p in objs.get("pod", {}).values() if p.get("metadata", {}).get("labels", {}).get(k) == v]
+
+verb = rest[0] if rest else ""
+ready = state.get("ready", {}).get(ns, [])
+
+if verb == "get":
+    if rest[1:2] == ["nodes"]: print("node1 Ready"); sys.exit(0)
+    kind = rest[1]
+    if len(rest) >= 3:
+        o = find(kind, rest[2])
+        if o is None:
+            print(f'Error from server (NotFound): {kind} "{rest[2]}" not found', file=sys.stderr); sys.exit(1)
+        jp = opts.get("-o", "")
+        if jp.startswith("jsonpath="): sys.stdout.write(evaluate(o, jp[len("jsonpath="):]))
+        else: print(rest[2])
+        sys.exit(0)
+    pods = selector_pods(opts["-l"]) if "-l" in opts else list(objs.get(ALIAS[kind], {}).values())
+    if "--field-selector" in opts:
+        want = opts["--field-selector"].split("=")[1]
+        pods = [p for p in pods if p.get("status", {}).get("phase") == want]
+    jp = opts.get("-o", "")
+    if jp.startswith("jsonpath="): sys.stdout.write(evaluate({"items": pods}, jp[len("jsonpath="):]))
+    else:
+        for p in pods: print(p["metadata"]["name"], "1/1 Running 0 1m")
+    sys.exit(0)
+
+if verb == "wait":
+    target = rest[1]  # pod/web
+    sys.exit(0 if target in ready else 1)
+
+if verb == "rollout" and rest[1] == "status":
+    t = rest[2].replace("deployment/", "deploy/")
+    sys.exit(0 if t in ready else 1)
+
+if verb == "delete": sys.exit(0)
+
+if verb == "run":
+    url = rest[-1]
+    svc = url.split("//")[1].split("/")[0]
+    if state.get("http", {}).get(ns, {}).get(svc):
+        print("<html><title>Welcome to nginx!</title></html>"); sys.exit(0)
+    print("wget: download timed out", file=sys.stderr); sys.exit(1)
+
+if verb == "exec":
+    pod = rest[1]; cmd = rest[rest.index("--") + 1:]
+    ex = state.get("exec", {}).get(ns, {}).get(pod)
+    if ex is None: sys.exit(1)
+    if cmd == ["env"]: print("\n".join(ex["env"])); sys.exit(0)
+    if cmd[0] == "cat":
+        if cmd[1] in ex["files"]: sys.stdout.write(ex["files"][cmd[1]]); sys.exit(0)
+        print(f"cat: can't open '{cmd[1]}'", file=sys.stderr); sys.exit(1)
+    sys.exit(1)
+
+print("simulateur : commande non gérée : " + " ".join(args), file=sys.stderr)
+sys.exit(3)

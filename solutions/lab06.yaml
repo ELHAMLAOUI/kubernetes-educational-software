@@ -1,0 +1,23 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: robust, namespace: lab06 }
+spec:
+  replicas: 2
+  selector:
+    matchLabels: { app: robust }
+  template:
+    metadata:
+      labels: { app: robust }
+    spec:
+      containers:
+        - name: nginx
+          image: nginx:1.25
+          ports: [ { containerPort: 80 } ]
+          readinessProbe:
+            httpGet: { path: /, port: 80 }
+          livenessProbe:
+            httpGet: { path: /, port: 80 }
+            initialDelaySeconds: 5
+          resources:
+            requests: { cpu: 100m, memory: 64Mi }
+            limits:   { cpu: 250m, memory: 128Mi }
