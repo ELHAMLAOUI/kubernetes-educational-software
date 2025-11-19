@@ -7,5 +7,5 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: pip install pyyaml
-      - run: shellcheck -S warning -e SC1091,SC2034 labctl lib/common.sh labs/*/*.sh solutions/*.sh tests/run-tests.sh
+      - run: shellcheck -S warning -e SC1091,SC2034 labctl lib/common.sh labs/*/*.sh tests/run-tests.sh
       - run: tests/run-tests.sh

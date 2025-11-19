@@ -2,7 +2,8 @@
 """Construit les états simulés à partir des VRAIS fichiers du dépôt (setup.sh et solutions)."""
 import base64, copy, json, re, sys, yaml
 
-REPO = sys.argv[1]; OUT = sys.argv[2]  # usage : build_states.py <racine du dépôt> <dossier de sortie>
+REPO = sys.argv[1]; OUT = sys.argv[2]  # usage : build_states.py <racine du dépôt> <dossier de sortie> [dossier des solutions]
+SOL = sys.argv[3] if len(sys.argv) > 3 else f"{REPO}/solutions"
 
 def setup_yaml(lab):
     txt = open(f"{REPO}/labs/{lab}/setup.sh").read()
@@ -10,7 +11,7 @@ def setup_yaml(lab):
     return [d for d in yaml.safe_load_all(m.group(1)) if d] if m else []
 
 def sol_yaml(lab):
-    return [d for d in yaml.safe_load_all(open(f"{REPO}/solutions/{lab}.yaml")) if d]
+    return [d for d in yaml.safe_load_all(open(f"{SOL}/{lab}.yaml")) if d]
 
 def normalize(o):
     """Valeurs par défaut posées par l'API server."""

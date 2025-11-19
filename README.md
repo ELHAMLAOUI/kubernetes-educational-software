@@ -63,6 +63,16 @@ Chaque `labs/labNN/check.sh` interroge l'API du cluster (`kubectl ... -o jsonpat
 - `.github/workflows/autograding.yml` : à chaque push, un cluster kind éphémère est créé, les rendus de `rendu/labNN/` sont appliqués, puis tous les labs sont vérifiés. Le rapport est publié en artefact. Le workflow est compatible avec GitHub Classroom.
 - `.github/workflows/selftest.yml` : vérifie que les solutions de référence obtiennent 20/20, ce qui garantit la cohérence du didacticiel.
 
+## Solutions de référence
+
+Les solutions ne sont pas dans la branche `main` : elles sont dans la branche **`solutions`**, qui ne contient que le dossier `solutions/`. Pour les récupérer dans votre copie de travail (le dossier est ignoré par Git sur `main`) :
+
+```bash
+git fetch origin solutions
+git archive FETCH_HEAD solutions | tar -x
+bash solutions/apply-all.sh   # applique toutes les solutions sur le cluster
+```
+
 ## Tests du didacticiel
 
 - `tests/run-tests.sh` exécute tous les scripts de vérification contre un **kubectl simulé**, sans cluster. Trois scénarios sont testés : solutions de référence (20/20 attendu à chaque lab), état de départ (0 point attendu, aucun point gratuit) et erreurs d'étudiant typiques (erreurs détectées attendues). Ce test est lancé à chaque push (`.github/workflows/tests.yml`).
@@ -74,7 +84,6 @@ Chaque `labs/labNN/check.sh` interroge l'API du cluster (`kubectl ... -o jsonpat
 labctl                 pilote (start / check / hint / reset / report)
 lib/common.sh          primitives de vérification, notation, export JSON
 labs/labNN/            README.md (énoncé), setup.sh, check.sh, hints.md
-solutions/             solutions de référence (version enseignant uniquement)
 tests/                 kubectl simulé et tests hors cluster
 rendu/                 dépôt des rendus étudiants
 .github/workflows/     correction automatique et auto-test

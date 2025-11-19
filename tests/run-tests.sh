@@ -7,13 +7,23 @@ set -u
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 TMP="$(mktemp -d)"
 trap 'rm -f "$ROOT/labs/lab07/diagnostic.txt"; rm -rf -- "$TMP"' EXIT
-python3 "$ROOT/tests/build_states.py" "$ROOT" "$TMP" >/dev/null || exit 1
+# Solutions de référence : dossier local solutions/ s'il existe, sinon la branche « solutions ».
+if [ -d "$ROOT/solutions" ]; then
+  SOL="$ROOT/solutions"
+else
+  git -C "$ROOT" fetch -q --depth=1 origin solutions 2>/dev/null
+  if ! git -C "$ROOT" archive FETCH_HEAD solutions 2>/dev/null | tar -x -C "$TMP"; then
+    echo "Solutions introuvables : branche « solutions » inaccessible." >&2; exit 1
+  fi
+  SOL="$TMP/solutions"
+fi
+python3 "$ROOT/tests/build_states.py" "$ROOT" "$TMP" "$SOL" >/dev/null || exit 1
 export PATH="$ROOT/tests/sim:$PATH" NO_COLOR=1
 fail=0
 
 run() { SIM_STATE="$TMP/$1.json" RESULTS_DIR="$TMP/res-$1" "$ROOT/labctl" report >"$TMP/$1.log" 2>&1; }
 
-sed -n '/<<.TXT./,/^TXT/p' "$ROOT/solutions/lab07.sh" | sed '1d;$d' > "$ROOT/labs/lab07/diagnostic.txt"
+sed -n '/<<.TXT./,/^TXT/p' "$SOL/lab07.sh" | sed '1d;$d' > "$ROOT/labs/lab07/diagnostic.txt"
 run solved
 while IFS=';' read -r lab _ pts max _; do
   [ "$lab" = "lab" ] && continue

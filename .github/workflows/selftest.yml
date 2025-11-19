@@ -9,6 +9,8 @@ jobs:
       - uses: actions/checkout@v4
       - uses: helm/kind-action@v1
         with: { cluster_name: labs }
+      - name: Récupérer les solutions (branche solutions)
+        run: git fetch --depth=1 origin solutions && git archive FETCH_HEAD solutions | tar -x
       - run: bash solutions/apply-all.sh
       - run: ./labctl report
       - run: grep -q '^TOTAL;;\([0-9.]*\);\1;20' results/rapport.csv
