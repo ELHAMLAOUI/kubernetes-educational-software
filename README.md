@@ -45,11 +45,11 @@ Exemple de sortie de `./labctl check 01` :
 ```
 Lab 01 — Mon premier Pod  (namespace : lab01)
 --------------------------------------------------------------
-  ✔ La ressource pod/web existe dans le namespace lab01 (+1)
-  ✘ Le conteneur utilise l'image nginx:1.25 (0/2)
+  [OK] La ressource pod/web existe dans le namespace lab01 (+1)
+  [KO] Le conteneur utilise l'image nginx:1.25 (0/2)
       obtenu : 'nginx:latest' — attendu : 'nginx:1.25'
       Indice : Champ spec.containers[0].image
-  ✔ Le Pod porte le label app=web (+2)
+  [OK] Le Pod porte le label app=web (+2)
   ...
 Lab 01 : 8/10 points — note 16.0/20 (4/5 vérifications)
 ```

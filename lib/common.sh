@@ -60,9 +60,9 @@ _record() { # _record PTS OK(0|1) DESC HINT DETAIL
   if [ "$ok" = "1" ]; then
     _POINTS=$(awk "BEGIN{print $_POINTS + $pts}")
     _NB_OK=$((_NB_OK + 1))
-    printf '  %s✔%s %s %s(+%s)%s\n' "$GREEN" "$RST" "$desc" "$DIM" "$pts" "$RST"
+    printf '  %s[OK]%s %s %s(+%s)%s\n' "$GREEN" "$RST" "$desc" "$DIM" "$pts" "$RST"
   else
-    printf '  %s✘%s %s %s(0/%s)%s\n' "$RED" "$RST" "$desc" "$DIM" "$pts" "$RST"
+    printf '  %s[KO]%s %s %s(0/%s)%s\n' "$RED" "$RST" "$desc" "$DIM" "$pts" "$RST"
     [ -n "$detail" ] && printf '      %s%s%s\n' "$DIM" "$detail" "$RST"
     [ -n "$hint" ]   && printf '      %sIndice : %s%s\n' "$YEL" "$hint" "$RST"
   fi
@@ -125,7 +125,7 @@ require_exists() {
 require_present() {
   local kind=$1 name=$2 hint=$3
   if ! exists "$kind" "$name"; then
-    printf '  %s✘%s La ressource %s/%s est absente du namespace %s\n' "$RED" "$RST" "$kind" "$name" "$NS"
+    printf '  %s[KO]%s La ressource %s/%s est absente du namespace %s\n' "$RED" "$RST" "$kind" "$name" "$NS"
     printf '      %sIndice : %s%s\n' "$YEL" "$hint" "$RST"
     echo "  ${YEL}Les vérifications suivantes dépendent de cette ressource : arrêt du lab.${RST}"
     lab_end
